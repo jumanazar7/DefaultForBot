@@ -1,13 +1,15 @@
 import asyncio
 
+import aiogram.utils.exceptions
 import pandas as pd
 from aiogram import types
 from aiogram.dispatcher import FSMContext
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup, \
+    ReplyKeyboardRemove
 
-from data.config import ADMINS
+from data.config import ADMINS, ADMINS_us, ADMINS_name
 from loader import dp, db, bot
 from states.state import Reklama
-
 
 yes_no = ReplyKeyboardMarkup(
     keyboard=[
@@ -60,6 +62,7 @@ async def rek(message:types.Message,state:FSMContext):
         data = await state.get_data()
         reklama = data.get("reklama")
         users = await db.select_all_users()
+        cnt = 1
         for user in users:
             try:
                 user_id = user['tg_id']
@@ -67,7 +70,9 @@ async def rek(message:types.Message,state:FSMContext):
                 await asyncio.sleep(0.05)
                 await state.finish()
             except aiogram.utils.exceptions.BotBlocked:
-                pass
+                cnt += 1
+        await message.bot.send_message(chat_id=ADMINS[0], text='Реклама отправлена успешно\n'
+                                                               f'Пользователи которые заблоктровали бот: {cnt}',reply_markup=ReplyKeyboardRemove())
     elif answer == 'Да':
         await message.answer(f'Введите название для кнопки',reply_markup=ReplyKeyboardRemove())
         await Reklama.reklama_3.set()
@@ -104,6 +109,7 @@ async def rek(message: types.Message, state: FSMContext):
                 [InlineKeyboardButton(text=f'{name}', url=url)]
             ]
         )
+        cnt = 0
         for user in users:
             try:
                 user_id = user['tg_id']
@@ -111,9 +117,11 @@ async def rek(message: types.Message, state: FSMContext):
                 await asyncio.sleep(0.05)
                 await state.finish()
             except aiogram.utils.exceptions.BotBlocked:
-                pass
+                cnt += 1
+        await message.bot.send_message(chat_id=ADMINS[0], text='Реклама отправлена успешно\n'
+                                                               f'Пользователи которые заблоктровали бот: {cnt}',reply_markup=ReplyKeyboardRemove())
     elif 'Да':
-        await message.answer('Отправьте изображение!')
+        await message.answer('Отправьте изображение!',reply_markup=ReplyKeyboardRemove())
         await Reklama.reklama_6.set()
 
 @dp.message_handler(content_types=['photo'], state=Reklama.reklama_6)
@@ -129,6 +137,7 @@ async def foto(message: types.Message, state: FSMContext):
             [InlineKeyboardButton(text=f'{name}', url=url)]
         ]
     )
+    cnt = 0
     for user in users:
         try:
             user_id = user['tg_id']
@@ -136,16 +145,22 @@ async def foto(message: types.Message, state: FSMContext):
             await asyncio.sleep(0.05)
             await state.finish()
         except aiogram.utils.exceptions.BotBlocked:
-            pass
-
+            cnt += 1
+        await message.bot.send_message(chat_id=ADMINS[0], text='Реклама отправлена успешно\n'
+                                                               f'Пользователи которые заблоктровали бот: {cnt}')
 
 @dp.message_handler(text="/cleandb", user_id=ADMINS)
-async def get_all_users(message: types.Message):
-    db.delete_users()
+async def get_all_users(message: types.Message, state: FSMContext):
+    await db.delete_users()
+    await db.add_user(tg_id=int(ADMINS[0]), username=ADMINS_us[0], nickname=ADMINS_name[0])
+    await db.add_user(tg_id=int(ADMINS[1]), username=ADMINS_us[1], nickname=ADMINS_name[1])
+    await db.update_user_langcode(langcode='ru', telegram_id=int(ADMINS[0]))
+    await db.update_user_langcode(langcode='ru', telegram_id=int(ADMINS[1]))
     await message.answer("База данных очищена!")
+    await state.finish()
 
 
 @dp.message_handler(text="/cleanct", user_id=ADMINS)
 async def get_all_cart(message: types.Message):
-    db.delete_cart()
+    await db.delete_cart()
     await message.answer("База данных корзины очищена!")
